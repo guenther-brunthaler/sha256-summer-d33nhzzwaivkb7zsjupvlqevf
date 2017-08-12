@@ -1,0 +1,8 @@
+cat << '===TRENNER===' | sh
+set -e; trap 'test $? = 0 || xmessage "Fehler!"' 0
+work() {
+cd $HOME/.bin
+openssl base64 -d | gzip -dc | patch -p1
+xmessage 'Patch wurde erfolgreich installiert!'
+}
+work << EOF
