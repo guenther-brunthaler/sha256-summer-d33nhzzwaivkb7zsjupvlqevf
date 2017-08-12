@@ -1,7 +1,7 @@
 #! /bin/sh
 show_version() {
 	wr -s <<- .
-	$APP version 2017.224.1
+	$APP version 2017.224.2
 
 	Copyright (c) 2017 Guenther Brunthaler. All rights reserved.
 	
@@ -90,11 +90,15 @@ request() {
 calc() {
 	local f sum
 	f=`xclip -selection clipboard -o`
-	test -f "$f" || die "In der Zwischenablage ist kein Pfad zu einer" \
-		"existierenden Datei!"
+	if test ! -f "$f"
+	then
+		echo "FEHLER: In der Zwischenablage befindet sich kein Pfad" \
+			" zu einer existierenden Datei!"
+		return
+	fi
 	sum=`sha256sum -b < "$f" | cut -d " " -f 1`
 	test "$sum"
-	cat <<- . | iconv -f UTF-7 | wr
+	cat <<- . | iconv -cf UTF-7 | wr
 
 	+ACo Die SHA-256 Pr+APw-fsumme +APw-ber die Datei mit dem Pfad
 

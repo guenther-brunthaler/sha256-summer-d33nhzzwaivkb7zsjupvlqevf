@@ -1,5 +1,5 @@
 cat << '===TRENNER===' | sh
-set -e; trap 'test $? = 0 || xmessage "Fehler"' 0
+set -e; trap 'test $? = 0 || xmessage "Fehler!"' 0
 work() {
 t=$HOME/.bin; mkdir -p -- "$t"; cd "$t"
 openssl base64 -d | xz -dc | cpio -iudm 2> /dev/null
