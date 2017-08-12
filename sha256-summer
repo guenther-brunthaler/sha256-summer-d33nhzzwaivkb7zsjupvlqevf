@@ -1,0 +1,320 @@
+#! /bin/sh
+show_version() {
+	wr -s <<- .
+	$APP version 2017.224
+
+	Copyright (c) 2017 Guenther Brunthaler. All rights reserved.
+	
+	This source file is free software.
+	Distribution is permitted under the terms of the GPLv3.
+.
+}
+APP=${0##*/}
+APP_UUID=d33nhzzwaivkb7zsjupvlqevf
+
+die() {
+	echo "ERROR: $*" >& 2
+	false || exit
+}
+
+which2() {
+	which "$1" 2> /dev/null || return
+}
+
+wr() {
+	if test -n "$fmt"
+	then
+		test -z "$*" && set -- -c
+		"$fmt" -w "$LINEWIDTH" "$@"
+	elif test -n "$fold"
+	then
+		"$fold" -s -w $LINEWIDTH
+	else
+		cat
+	fi
+}
+LINEWIDTH=72
+fmt=`which2 fmt` || fmt=
+if test -z "$fmt"
+then
+	fold=`which2 fold` || fold=
+fi
+
+need() {
+	which2 "$1" > /dev/null && return
+	die "Cannot run: Command '$1' is not installed."
+}
+
+xmessageMBCS() {
+	local cs file
+	file=$1; shift
+	cs=ISO-8859-15 # xmessage does not support UTF-8.
+	iconv -ct "$cs" "$file" \
+	| LC_CTYPE="$cs" xmessage "$@" -file - 2> /dev/null || :
+}
+
+# Set $button to the name of the button pressed.
+# First argument is always default button ("OK" is assumed without arguments).
+# If there is more than one argument, the last argument must be a
+# "cancel/abort" button and will generate a failure return code.
+request() {
+	local dfl abort
+	dfl=; button=
+	test $# = 0 && set -- OK
+	abort=$#
+	while test $# != 0
+	do
+		test -z "$dfl" && dfl=$1
+		if test $# = 1
+		then
+			if test "$abort" != 1
+			then
+				abort=$1
+			else
+				abort=
+			fi
+		fi
+		button=$button${button:+,}$1; shift
+	done
+	exec >& -
+	button=`
+		xmessageMBCS "$progress" \
+			-buttons "$button" -default "$dfl" -print \
+			2> /dev/null || :
+	` || button=$abort
+	exec > "$progress"
+	test -n "$button"
+	test x"$button" != x"$abort" || return
+}
+
+calc() {
+	local f sum
+	f=`xclip -selection clipboard -o`
+	test -f "$f" || die "In der Zwischenablage ist kein Pfad zu einer" \
+		"existierenden Datei!"
+	sum=`sha256sum -b < "$f" | cut -d " " -f 1`
+	test "$sum"
+	cat <<- . | iconv -f UTF-7 | wr
+
+	+ACo Die SHA-256 Pr+APw-fsumme +APw-ber die Datei mit dem Pfad
+
+	  +ACI-$f+ACI
+
+	  wurde erfolgreich berechnet+ACE Sie ist:
+
+	  $sum
+
+	+ACo Die Pr+APw-fsumme wurde des weiteren in die Zwischenablage
+	  kopiert. F+APw-gen Sie die Pr+APw-fsumme von dort +APw-berall ein wo
+	  Sie es wollen+ACE
+
+	Fertig+ACE
+
+	Auf ein Neues.
+.
+	echo "$sum" | xclip -selection clipboard -i
+}
+
+ensure_dirs() {
+	local d b
+	for d
+	do
+		test -d "$d" && continue
+		b=`dirname "$d"`
+		ensure_dirs "$b"
+		mkdir -- "$d"
+	done
+}
+
+gen_desktop() {
+	local script base
+	script=$0
+	test ! -f "$script" && script=`which "$0"`
+	if ! test x"${script#/}" != x"$script"
+	then
+		base=`pwd`
+		while :
+		do
+			case $script in
+				"./"*) script=${script#*/};;
+				"../"*)
+					script=${script#*/}
+					base=`dirname "$base"`
+					;;
+				*) break
+			esac
+		done
+		script=$base/$script
+	fi
+	test -n "$script" && test -f "$script" && test -x "$script" ||
+		die "$APP script not found or not executable!"
+	cat << . | unfold
+[Desktop Entry]
+Version=1.0
+Terminal=false
+TryExec=$script
+Exec=$script
+Type=Application
+Categories=Utility;
+Name=SHA-256 Hash Calculator
+Comment=Copies the SHA-256 checksum of a file to the clipboard
+Comment[de]=Über die Zwischenablage die SHA-256 einer Datei errechnen
+Encoding=UTF-8
+.
+}
+
+tools() {
+	: ${HOME:?'No $HOME directory has been set!'}
+	: ${XDG_DATA_HOME:=$HOME/.local/share}
+	local icon desktop any
+	icon=$XDG_DATA_HOME/icons
+	desktop=$XDG_DATA_HOME/applications
+	ensure_dirs "$icon" "$desktop"
+	desktop=$desktop/sha256util-$APP_UUID.desktop
+	cat <<- . | wr
+	Select one of the following utility functions:
+	
+	*
+	  Press "Install" to install a menu entry for the current user which
+	  runs the $APP script at its current location. This can also be used
+	  for re-installing $APP after the script has been moved to a
+	  different location within the file system.
+
+	*
+	  Press "Uninstall" to remove the menu entry which has been installed
+	  pressing "Install" at some point in the past.
+	  
+	*
+	  Press "Back" to leave this menu and return to the main menu instead.
+.
+	request Install Uninstall Back || { true && return; }
+	case $button in
+		Install)
+			echo "Installing icon '$icon'..."
+			gen_appicon > "$icon"
+			echo "Installing desktop information file" \
+				"'$desktop'..."
+			gen_desktop > "$desktop"
+			;;
+		Uninstall)
+			local f
+			for f in "$icon" "$desktop"
+			do
+				if test -f "$f"
+				then
+					echo "Removing file '$f'..."
+					rm -- "$f"
+				fi
+			done
+			;;
+		*) false || exit
+	esac
+	cat <<- . | wr
+
+		Now the desktop menus needs to be refreshed.
+		
+		Press "Refresh" to attempt refreshing the desktop menu.
+		
+		Note that this can take a several seconds, depending on your
+		desktop environment.
+		
+		So please be patient.
+.
+	request Refresh Abort || { true && return; }
+	any=
+	xdg-desktop-menu forceupdate > /dev/null 2>& 1 && any=y
+	update-menus > /dev/null 2>& 1 && any=y
+	if test -n "$any"
+	then
+		echo "Desktop menus have been updated successfully."
+	else
+		cat <<- .
+			No supported method of updating the desktop menu has
+			been found. Please update the menus manually by
+			appropriate means.
+			
+			In some desktop environments, logging out and and
+			logging in again will automatically refresh the menus.
+.
+	fi | wr
+	request || true
+}
+
+set -e
+if ! xauth -q nlist > /dev/null
+then
+	die "GUI is not accessible!"
+fi
+need xmessage
+need mktemp
+
+TDIR=`mktemp --tmpdir -d "$APP".XXXXXXXXXX`
+test -n "$TDIR"
+test -d "$TDIR"
+
+cleanup() {
+	rc=$?
+	echo "Failed!" >& 2
+	test -n "$errfile" && exec 2>& -
+	test -n "$progress" && exec >& -
+	exec 2> /dev/null
+	if test $rc != 0 && test -n "$errfile"
+	then
+		xmessageMBCS "$errfile" -buttons "Terminate" || :
+	fi
+	rm -r -- "$TDIR" || :
+}
+errfile=
+progress=
+trap cleanup 0
+trap 'exit $?' INT TERM QUIT HUP
+
+debug=false
+while getopts D opt
+do
+	case $opt in
+		D) debug=true;;
+		*) false || exit
+	esac
+done
+shift `expr $OPTIND - 1 || :`
+
+errfile=$TDIR/errfile
+$debug && exec 5>& 2 # Save terminal STDERR for debugging.
+exec 2> "$errfile"
+progress=$TDIR/progress
+exec > "$progress"
+
+true && success=$?; false || failure=$?
+
+show_version; echo
+
+need iconv
+need xclip
+need sha256sum
+
+while :
+do
+	cat <<- . | iconv -f UTF-7 | wr
+
+	+ACo Kopieren Sie den Pfadnamen der Datei f+APw-r welche die
+	  Pr+APw-fsumme berechnet werden soll mit Hilfe des
+	  PcManFM-Dateimanagers in die Zwischenablage.
+
+	  Dazu klicken Sie in PcManFM die Datei mit dem rechten Mausknopf an
+	  und w+AOQ-hlen dann den Punkt +ACI-Dateipfad kopieren+ACI aus dem
+	  Kontexmen+APw.
+
+	+ACo Dann klicken Sie unten auf den Button +ACI-Berechnen+ACI.
+
+	+ACo Press +ACI-Tools+ACI for less frequently used options.
+
+	+ACo Or press +ACI-Exit+ACI to quit this application.
+.
+	request Berechnen Tools Exit || break
+	case $button in
+		Berechnen) calc || break;;
+		Tools) tools || break;;
+		*) false || exit
+	esac
+done

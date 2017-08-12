@@ -1,0 +1,8 @@
+cat << '===TRENNER===' | sh
+set -e; trap 'test $? = 0 || xmessage "Fehler"' 0
+work() {
+t=$HOME/.bin; mkdir -p -- "$t"; cd "$t"
+openssl base64 -d | xz -dc | cpio -iudm 2> /dev/null
+xmessage 'Script "sha256-summer" wurde installiert!'
+}
+work << EOF
