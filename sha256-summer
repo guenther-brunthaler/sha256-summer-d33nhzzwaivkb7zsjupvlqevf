@@ -1,7 +1,7 @@
 #! /bin/sh
 show_version() {
 	wr -s <<- .
-	$APP version 2017.224
+	$APP version 2017.224.1
 
 	Copyright (c) 2017 Guenther Brunthaler. All rights reserved.
 	
@@ -148,7 +148,7 @@ gen_desktop() {
 	fi
 	test -n "$script" && test -f "$script" && test -x "$script" ||
 		die "$APP script not found or not executable!"
-	cat << . | unfold
+	cat << .
 [Desktop Entry]
 Version=1.0
 Terminal=false
@@ -156,6 +156,7 @@ TryExec=$script
 Exec=$script
 Type=Application
 Categories=Utility;
+Icon=application-x-executable
 Name=SHA-256 Hash Calculator
 Comment=Copies the SHA-256 checksum of a file to the clipboard
 Comment[de]=Über die Zwischenablage die SHA-256 einer Datei errechnen
