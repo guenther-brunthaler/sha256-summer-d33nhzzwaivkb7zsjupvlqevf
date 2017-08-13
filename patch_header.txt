@@ -14,7 +14,7 @@ Dieser Patch ist nicht für die aktuelle Version der Datei
 Vielleicht wurde er bereits angebracht?
 end
 fi
-openssl base64 -d | gzip -dc | patch -p1
+openssl base64 -d | %u | patch -p1
 xmessage "Patch für '%f' wurde erfolgreich installiert"'!'
 }
 work << EOF

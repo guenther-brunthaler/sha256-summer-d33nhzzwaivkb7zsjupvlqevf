@@ -11,7 +11,7 @@ trap cleanup 0
 trap 'exit $?' INT QUIT TERM HUP
 
 DEBUG=false
-while getopts F opt
+while getopts D opt
 do
 	case $opt in
 		D) DEBUG=true;;
@@ -72,19 +72,40 @@ case $subject in
 		;;
 	*) false
 esac
+
+smallest=
+for packer in 'gzip -9c|-dc' 'bzip2 -9c|-dc' 'xz -9c|-dc' 'xz -c|-dc' 'cat|'
+do
+	unpack=${packer##*"|"}; pack=${packer%"|$unpack"}
+	unpack=${pack%%" "*}${unpack:+" "}$unpack
+	if
+		$pack < "$TD/diffs" > "$TD/diffs".pak 2> /dev/null \
+		&& test -s "$TD/diffs".pak \
+		&& bytes=`
+			if $DEBUG && test "$pack" = cat
+			then
+				echo -1
+			else
+				wc -c < "$TD/diffs".pak
+			fi
+		` \
+		&& { test -z "$smallest" || test $bytes -lt $smallest; }
+	then
+		best_u=$unpack
+		mv -- "$TD/diffs".pak "$TD/diffs".best
+		smallest=$bytes
+	fi
+done
+test "$smallest"
+unpack=$best_u
+rm -f -- "$TD/diffs".pak
 if $DEBUG
 then
-	:
+	cat < "$TD/diffs".best
 else
-	case $subject in
-		patch) pack='gzip -9c';;
-		installer) pack='xz -c';;
-		*) false
-	esac
-	$pack < "$TD/diffs" > "$TD/diffs".pak
-	openssl base64 < "$TD/diffs".pak > "$TD/diffs"
-	rm -- "$TD/diffs".pak
-fi
+	openssl base64 < "$TD/diffs".best
+fi > "$TD/diffs"
+rm -- "$TD/diffs".best
 
 largest=-1
 tag_file=
@@ -101,7 +122,14 @@ test $largest != -1
 cksum=`git show "$client_commit:$tag_file" | cksum`
 
 expand() {
-	sed "s|%d|$client_cd|g; s|%f|$tag_file|g; s|%c|$cksum|g" "$1"
+	local r i p
+	p=
+	for i in "d$client_cd" "f$tag_file" "c$cksum" "u$unpack"
+	do
+		r=${i#?}; i=${i%"$r"}
+		p="$p${p:+"; "}s|%$i|$r|g"
+	done
+	sed "$p" "$1"
 }
 
 expand "$header"
