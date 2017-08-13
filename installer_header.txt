@@ -1,3 +1,7 @@
+
+Kopiere den gesamten Text unterhalb dieses Absatzes beginnend nach der TEXT AB Zeile bis vor die TEXT BIS Zeile ins Terminal-Fenster.
+
+[TEXT AB DIESER ZEILE INS TERMINAL KOPIEREN]
 cat << '===TRENNER===' | sh
 set -e; trap 'test $? = 0 || xmessage "Fehler!"' 0
 work() {
