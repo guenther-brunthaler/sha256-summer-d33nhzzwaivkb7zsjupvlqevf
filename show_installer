@@ -120,11 +120,15 @@ done < "$TD/files"
 test $largest != -1
 
 cksum=`git show "$client_commit:$tag_file" | cksum`
+show_file=`printf '%s\n' "$tag_file" | iconv -t UTF-7`
+# Latin1 means byte-semantics.
+tag_file=`printf '%s\n' "$tag_file" | iconv -f LATIN1 -t UTF-7`
 
 expand() {
 	local r i p
 	p=
-	for i in "d$client_cd" "f$tag_file" "c$cksum" "u$unpack"
+	for i in \
+		"d$client_cd" "f$tag_file" "w$show_file" "c$cksum" "u$unpack"
 	do
 		r=${i#?}; i=${i%"$r"}
 		p="$p${p:+"; "}s|%$i|$r|g"

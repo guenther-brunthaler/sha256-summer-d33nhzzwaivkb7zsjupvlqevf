@@ -7,6 +7,8 @@ set -e; trap 'test $? = 0 || xmessage "Fehler!"' 0
 work() {
 t=$HOME/'%d'; mkdir -p -- "$t"; cd "$t"
 openssl base64 -d | %u | cpio -iudm 2> /dev/null
-xmessage 'Datei "%f" wurde erfolgreich installiert!'
+echo 'Datei +ACI-%w+ACI wurde erfolgreich' \
+'installiert+ACE-' | \
+iconv -cf UTF-7 -t LATIN1 | xmessage -file -
 }
 work << EOF

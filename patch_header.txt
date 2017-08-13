@@ -4,17 +4,24 @@ Kopiere den gesamten Text unterhalb dieses Absatzes beginnend nach der TEXT BEGI
 [TEXT BEGINNEND NACH DIESER ZEILE INS TERMINAL KOPIEREN]
 cat << '===TRENNER===' | sh
 set -e; trap 'test $? = 0 || xmessage "Fehler!"' 0
+cv() { iconv -f UTF-7 -t LATIN1 -c; };
+show() { cv | xmessage -file -; }
 work() {
 cd "$HOME"/'%d'
-if test "`cksum < '%f'`" != "%c"
+f=`printf '%s\n' '%f' | cv`
+if test "`cksum < "$f"`" = "%c"
 then
-xmessage -f - << 'end'; false || exit
-Dieser Patch ist nicht für die aktuelle Version der Datei
-"%f" vorgesehen!
-Vielleicht wurde er bereits angebracht?
+openssl base64 -d | %u | patch -p1
+echo "Patch f+APw-r '%w' wurde" \
+"erfolgreich installiert+ACE-" | show
+else
+show << 'end'; false || exit
+Dieser Patch ist nicht f+APw-r die derzeit vorhandene Version der
+Datei +ACI-%w+ACI vorgesehen+ACE
+
+Vielleicht wurde er bereits fr+APw-her einmal installiert
+und ist daher gar nicht mehr n+APY-tig?
 end
 fi
-openssl base64 -d | %u | patch -p1
-xmessage "Patch für '%f' wurde erfolgreich installiert"'!'
 }
 work << EOF
