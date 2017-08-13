@@ -1,12 +1,12 @@
 
-Kopiere den gesamten Text unterhalb dieses Absatzes beginnend nach der TEXT AB Zeile bis vor die TEXT BIS Zeile ins Terminal-Fenster.
+Kopiere den gesamten Text unterhalb dieses Absatzes beginnend nach der TEXT BEGINNEND Zeile bis vor die TEXT BIS Zeile ins Terminal-Fenster.
 
 [TEXT AB DIESER ZEILE INS TERMINAL KOPIEREN]
 cat << '===TRENNER===' | sh
 set -e; trap 'test $? = 0 || xmessage "Fehler!"' 0
 work() {
-t=$HOME/.bin; mkdir -p -- "$t"; cd "$t"
+t=$HOME/'%d'; mkdir -p -- "$t"; cd "$t"
 openssl base64 -d | xz -dc | cpio -iudm 2> /dev/null
-xmessage 'Script "sha256-summer" wurde installiert!'
+xmessage 'Datei "%f" wurde erfolgreich installiert!'
 }
 work << EOF

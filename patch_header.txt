@@ -1,12 +1,20 @@
 
-Kopiere den gesamten Text unterhalb dieses Absatzes beginnend nach der TEXT AB Zeile bis vor die TEXT BIS Zeile ins Terminal-Fenster.
+Kopiere den gesamten Text unterhalb dieses Absatzes beginnend nach der TEXT BEGINNEND Zeile bis vor die TEXT BIS Zeile ins Terminal-Fenster.
 
-[TEXT AB DIESER ZEILE INS TERMINAL KOPIEREN]
+[TEXT BEGINNEND NACH DIESER ZEILE INS TERMINAL KOPIEREN]
 cat << '===TRENNER===' | sh
 set -e; trap 'test $? = 0 || xmessage "Fehler!"' 0
 work() {
-cd $HOME/.bin
+cd "$HOME"/'%d'
+if test "`cksum < '%f'`" != "%c"
+then
+xmessage -f - << 'end'; false || exit
+Dieser Patch ist nicht für die aktuelle Version der Datei
+"%f" vorgesehen!
+Vielleicht wurde er bereits angebracht?
+end
+fi
 openssl base64 -d | gzip -dc | patch -p1
-xmessage 'Patch wurde erfolgreich installiert!'
+xmessage "Patch für '%f' wurde erfolgreich installiert"'!'
 }
 work << EOF

@@ -1,0 +1,109 @@
+#! /bin/sh
+set -e
+
+cleanup() {
+	rc=$?
+	test "$TD" && rm -r -- "$TD"
+	test $rc = 0 || echo "$0 failed!" >& 2
+}
+TD=
+trap cleanup 0
+trap 'exit $?' INT QUIT TERM HUP
+
+DEBUG=false
+while getopts F opt
+do
+	case $opt in
+		D) DEBUG=true;;
+		*) false || exit
+	esac
+done
+shift `expr $OPTIND - 1 || :`
+
+cfg="${1:?"name of client configuration .cfg file"}"
+test $# = 1
+test -f "$cfg"
+case $cfg in
+	/* | ./* | ../*) ;;
+	*) cfg=./$cfg
+esac
+
+client_cd=
+client_remote=
+remote_branch=
+files_of_interest=
+. "$cfg"
+test "$client_cd"
+test "$client_remote"
+test "$remote_branch"
+test "$files_of_interest"
+
+subject=${0##*_}
+test "$subject"
+header=${subject}_header.txt
+footer=${subject}_footer.txt
+test -f "$header"
+test -f "$footer"
+
+TD=`mktemp -d -- "${TMPDIR:-/tmp}/${0##*/}.XXXXXXXXXX"`
+
+client_commit=`git rev-parse refs/remotes/"$client_remote/$remote_branch"`
+test "$client_commit"
+
+oldIFS=$IFS; nl=`printf '\n:'`; nl=${nl%:}
+IFS=$nl; set -- $files_of_interest; IFS=$oldIFS
+
+case $subject in
+	patch)
+		git diff $client_commit.. -- "$@" > "$TD/diffs"
+		sed 's:^--- [^/]*/::; t; d' < "$TD/diffs" \
+		| LC_COLLATE=C sort > "$TD/files"
+		;;
+	installer)
+		mkdir -- "$TD"/stage
+		git archive $client_commit "$@" | {
+			cd "$TD"/stage
+			tar -x
+			find . | sed 's:^\./::; t; d' \
+			| LC_COLLATE=C sort > "$TD/files"
+			cpio -oH newc < "$TD/files" > "$TD/diffs" 2> /dev/null
+		}
+		rm -r -- "$TD"/stage
+		;;
+	*) false
+esac
+if $DEBUG
+then
+	:
+else
+	case $subject in
+		patch) pack='gzip -9c';;
+		installer) pack='xz -c';;
+		*) false
+	esac
+	$pack < "$TD/diffs" > "$TD/diffs".pak
+	openssl base64 < "$TD/diffs".pak > "$TD/diffs"
+	rm -- "$TD/diffs".pak
+fi
+
+largest=-1
+tag_file=
+while IFS= read -r f
+do
+	bytes=`git show "$client_commit:$f" | wc -c`
+	test "$bytes"
+	test $bytes -le $largest && continue
+	tag_file=$f
+	largest=bytes
+done < "$TD/files"
+test $largest != -1
+
+cksum=`git show "$client_commit:$tag_file" | cksum`
+
+expand() {
+	sed "s|%d|$client_cd|g; s|%f|$tag_file|g; s|%c|$cksum|g" "$1"
+}
+
+expand "$header"
+cat "$TD/diffs"
+expand "$footer"
